@@ -20,29 +20,23 @@ pg_conn.autocommit = True
 cursor = pg_conn.cursor()
 
 def start_worker():
-    print("Worker is awake (using psycopg2)...")
-    
+    print("Worker started")
+
     while True:
-        result = r.brpop("logs", timeout=0)
-        
+        result = r.brpop('logs', timeout=0)
         if result:
             _, log_json = result
-            
-            log_data = json.loads(log_json)
+            log_entry = json.loads(log_json)
             try:
-                cursor.execute("""
-                    INSERT INTO logs (service_name, level, message, timestamp)
-                    VALUES (%s, %s, %s, %s)
-                """, (
-                    log_data['service_name'], 
-                    log_data['level'], 
-                    log_data['message'], 
-                    log_data['timestamp']
-                ))
-                print(f"Saved log from: {log_data['service_name']}")
+                cursor.execute(
+                    "INSERT INTO logs (service_name, level, message, timestamp) VALUES (%s, %s, %s, %s)",
+                    (log_entry['service_name'], log_entry['level'], log_entry['message'], log_entry['timestamp'])
+                )
+                print(f"Inserted log: {log_entry}")
             except Exception as e:
-                print(f"Database error: {e}")
-
+                print(f"Error inserting log: {e}")
+                r.rpush('logs', log_json)
+                time.sleep(1)
+            
 if __name__ == "__main__":
     start_worker()
-    
